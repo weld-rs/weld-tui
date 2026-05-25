@@ -76,30 +76,74 @@ protect-repo repo:
     #!/usr/bin/env bash
     set -euo pipefail
     REPO="weld-rs/{{repo}}"
-    RULESET_NAME="main-branch-protection"
     echo "🛡️  Applying protections to $REPO..."
 
-    # 1. Branch ruleset on the default branch
-    RULESET_JSON=$(cat <<'JSON'
+    # Helper: create or update a ruleset by name (idempotent)
+    apply_ruleset() {
+        local name="$1"
+        local json="$2"
+        local existing
+        existing=$(gh api "/repos/$REPO/rulesets" --jq ".[] | select(.name == \"$name\") | .id" 2>/dev/null || true)
+        if [ -n "$existing" ]; then
+            echo "  ↻ updating '$name' (id=$existing)"
+            echo "$json" | gh api -X PUT "/repos/$REPO/rulesets/$existing" --input - >/dev/null
+        else
+            echo "  + creating '$name'"
+            echo "$json" | gh api -X POST "/repos/$REPO/rulesets" --input - >/dev/null
+        fi
+    }
+
+    # 1a. Remove the legacy single-ruleset "main" if present (replaced by the pair below)
+    LEGACY_ID=$(gh api "/repos/$REPO/rulesets" --jq '.[] | select(.name == "main") | .id' 2>/dev/null || true)
+    if [ -n "$LEGACY_ID" ]; then
+        echo "  ✗ removing legacy 'main' ruleset (id=$LEGACY_ID)"
+        gh api -X DELETE "/repos/$REPO/rulesets/$LEGACY_ID" >/dev/null
+    fi
+
+    # 1b. Baseline ruleset: applies to ALL branches
+    ALL_BRANCHES_JSON=$(cat <<'JSON'
     {
-      "name": "main-branch-protection",
+      "name": "all-branches",
+      "target": "branch",
+      "enforcement": "active",
+      "conditions": {
+        "ref_name": {"include": ["~ALL"], "exclude": []}
+      },
+      "bypass_actors": [
+        {"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}
+      ],
+      "rules": [
+        {"type": "non_fast_forward"},
+        {"type": "required_signatures"}
+      ]
+    }
+    JSON
+    )
+    apply_ruleset "all-branches" "$ALL_BRANCHES_JSON"
+
+    # 1c. Hardening ruleset: applies only to the default branch
+    DEFAULT_BRANCH_JSON=$(cat <<'JSON'
+    {
+      "name": "default-branch",
       "target": "branch",
       "enforcement": "active",
       "conditions": {
         "ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}
       },
+      "bypass_actors": [
+        {"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}
+      ],
       "rules": [
         {"type": "deletion"},
-        {"type": "non_fast_forward"},
         {"type": "required_linear_history"},
         {
           "type": "pull_request",
           "parameters": {
-            "required_approving_review_count": 0,
-            "dismiss_stale_reviews_on_push": false,
+            "required_approving_review_count": 1,
+            "dismiss_stale_reviews_on_push": true,
             "require_code_owner_review": false,
             "require_last_push_approval": false,
-            "required_review_thread_resolution": false,
+            "required_review_thread_resolution": true,
             "allowed_merge_methods": ["squash"]
           }
         }
@@ -107,15 +151,7 @@ protect-repo repo:
     }
     JSON
     )
-    EXISTING_ID=$(gh api "/repos/$REPO/rulesets" --jq ".[] | select(.name == \"$RULESET_NAME\") | .id" 2>/dev/null || true)
-    if [ -n "$EXISTING_ID" ]; then
-        echo "  ↻ updating existing ruleset (id=$EXISTING_ID)"
-        echo "$RULESET_JSON" | gh api -X PUT "/repos/$REPO/rulesets/$EXISTING_ID" --input - >/dev/null
-    else
-        echo "  + creating ruleset"
-        echo "$RULESET_JSON" | gh api -X POST "/repos/$REPO/rulesets" --input - >/dev/null
-    fi
-    echo "  ✓ branch ruleset"
+    apply_ruleset "default-branch" "$DEFAULT_BRANCH_JSON"
 
     # 2. Secret scanning + push protection
     gh api -X PATCH "/repos/$REPO" \
@@ -134,10 +170,12 @@ protect-repo repo:
     echo ""
     echo "✅ $REPO protected"
     echo ""
-    echo "⚠️  Manual one-time setup (not cleanly exposed via API):"
+    echo "⚠️  Manual per-repo follow-ups (require repo-specific setup):"
+    echo "   • Add required status checks to the ruleset once CI exists"
+    echo "   • Enable CodeQL (Security → Code scanning) + add to ruleset"
     echo "   • Settings → Actions → General → Fork pull request workflows:"
     echo "     'Require approval for first-time contributors'"
-    echo "   • Install Renovate app + add .github/renovate.json (per repo)"
+    echo "   • Install Renovate app + add .github/renovate.json"
 
 # Show unresolved, non-outdated review comments on a PR
 [group('GitHub')]
