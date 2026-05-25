@@ -10,6 +10,7 @@ use weld_core::file::inline_diff::InlineKind;
 use weld_core::text::expand_tabs;
 
 use crate::app::App;
+use crate::overlay::{self, Overlay};
 use crate::theme::Theme;
 
 /// Fixed width (in columns) of the minimap pane when shown.
@@ -21,11 +22,7 @@ struct SideLines {
     code: Vec<ratatui::text::Line<'static>>,
 }
 
-#[derive(Clone, Copy)]
-enum Side {
-    Left,
-    Right,
-}
+use crate::app::Side;
 
 /// Shared parameters for rendering a file pane.
 struct PaneContext<'a> {
@@ -231,6 +228,57 @@ fn render_file_pane(frame: &mut Frame, area: ratatui::layout::Rect, ctx: &PaneCo
     );
 }
 
+/// Build the status-bar hint line with optional chord-progress highlighting.
+fn status_hint<'a>(app: &App, theme: &Theme) -> ratatui::text::Line<'a> {
+    let normal = Style::default().fg(theme.status_bar_fg);
+    let highlight = Style::default()
+        .fg(theme.key_hint_fg)
+        .add_modifier(ratatui::style::Modifier::BOLD);
+
+    let is_dirty = app.model.left_dirty || app.model.right_dirty;
+
+    let prefix = if app.model.change_count == 0 {
+        " Files are identical  [".to_string()
+    } else {
+        format!(
+            " {}/{}  [",
+            app.model.current_block + 1,
+            app.model.change_count,
+        )
+    };
+
+    let mut spans = vec![Span::styled(prefix, normal)];
+
+    if is_dirty {
+        let q_active = app.input.pending_q
+            && app
+                .input
+                .pending_q_at
+                .map(|t| t.elapsed() <= crate::app::CHORD_TIMEOUT)
+                .unwrap_or(false);
+
+        let q_style = if q_active { highlight } else { normal };
+        let both_dirty = app.model.left_dirty && app.model.right_dirty;
+
+        if both_dirty {
+            spans.push(Span::styled("w → save…", normal));
+        } else {
+            spans.push(Span::styled("w → save", normal));
+            spans.push(Span::styled(" | ", normal));
+            spans.push(Span::styled("wq → save & quit", normal));
+        }
+        spans.push(Span::styled(" | ", normal));
+        spans.push(Span::styled("q", q_style));
+        spans.push(Span::styled("! → force quit", normal));
+    } else {
+        spans.push(Span::styled("q → quit", normal));
+    }
+
+    spans.push(Span::styled("]", normal));
+
+    ratatui::text::Line::from(spans)
+}
+
 /// Top-level UI: two file panes side by side + status bar.
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let [body, status] =
@@ -393,23 +441,21 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         );
     }
 
-    // Status bar
-    let change_count = app.model.change_count;
-    let hint_text = if change_count == 0 {
-        " Files are identical  [q → quit]".to_string()
-    } else {
-        format!(
-            " {}/{}  [q → quit]",
-            app.model.current_block + 1,
-            change_count,
-        )
-    };
-    let hint_style = Style::default().fg(theme.status_bar_fg);
+    // Status bar.
+    let hint_line = status_hint(app, theme);
     frame.render_widget(
-        Paragraph::new(ratatui::text::Line::from(vec![Span::styled(
-            hint_text, hint_style,
-        )]))
-        .alignment(Alignment::Center),
+        Paragraph::new(hint_line).alignment(Alignment::Center),
         status,
     );
+
+    // Modal overlays render on top of everything else.
+    match &app.overlay {
+        Some(Overlay::WriteError { path, message }) => {
+            overlay::render_write_error(frame, frame.area(), theme, path, message);
+        }
+        Some(Overlay::SavePicker) => {
+            overlay::render_save_picker(frame, frame.area(), theme);
+        }
+        None => {}
+    }
 }

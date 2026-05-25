@@ -103,6 +103,11 @@ impl Content {
         &self.lines
     }
 
+    /// The path this content was loaded from (or empty for in-memory content).
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
     /// Replace a range of lines with new content.
     ///
     /// # Panics

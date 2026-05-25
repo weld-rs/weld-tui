@@ -50,6 +50,8 @@ pub struct Theme {
     pub overlay_bg: Color,
     /// Overlay text
     pub overlay_fg: Color,
+    /// Accent color for keybinding hints in overlays
+    pub key_hint_fg: Color,
 }
 
 /// Catppuccin Macchiato palette.
@@ -79,6 +81,7 @@ impl Default for Theme {
             active_block_style: Style::default().fg(Color::Rgb(245, 169, 127)), // Peach
             overlay_bg: Color::Rgb(30, 32, 48),             // Mantle
             overlay_fg: Color::Rgb(202, 211, 245),          // Text
+            key_hint_fg: Color::Rgb(245, 169, 127),         // Peach
         }
     }
 }

@@ -3,6 +3,7 @@ mod config;
 mod event;
 mod file_diff;
 mod input;
+mod overlay;
 mod theme;
 mod viewport;
 
@@ -66,6 +67,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let result = main_loop(&mut terminal, &mut app);
 
     ratatui::restore();
+
+    app.saved_files.sort();
+    app.saved_files.dedup();
+    let left_path = app.model.left_content.path().display().to_string();
+    for path in &app.saved_files {
+        let (basename, side) = if path == &left_path {
+            (&app.left_filename, "left")
+        } else {
+            (&app.right_filename, "right")
+        };
+        println!("{basename} ({side}): saved");
+    }
+
     result
 }
 
