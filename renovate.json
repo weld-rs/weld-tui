@@ -2,16 +2,17 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:best-practices", "helpers:pinGitHubActionDigests"],
   "timezone": "America/New_York",
-  "schedule": ["after 3am and before 5am on Saturday"],
+  "schedule": ["on the 1st day of the month"],
   "enabledManagers": ["cargo", "github-actions", "custom.regex"],
   "printConfig": false,
+  "configMigration": true,
   "automerge": false,
   "branchConcurrentLimit": 0,
   "prConcurrentLimit": 0,
   "prHourlyLimit": 0,
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
-    "schedule": ["after 3am and before 5am on Saturday"],
+    "schedule": ["on Saturday"],
     "addLabels": ["security"]
   },
   "prBodyTemplate": "{{{header}}}{{{table}}}{{{notes}}}{{{changelogs}}}{{{configDescription}}}{{{controls}}}{{{footer}}}",
@@ -27,7 +28,7 @@
     "Update": "{{{displayFrom}}} → {{{displayTo}}}",
     "Change": "{{{#if changelogUrl}}}[Changelog]({{{changelogUrl}}}){{{/if}}}"
   },
-  "fetchReleaseNotes": true,
+  "fetchChangeLogs": "pr",
   "lockFileMaintenance": {
     "enabled": false
   },

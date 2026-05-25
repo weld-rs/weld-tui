@@ -60,16 +60,16 @@ reviews:
   auto_review:
     enabled: true
     auto_incremental_review: true
+    # Skip mechanical Renovate PRs to avoid rate-limit churn and review noise.
+    # CI still validates these PRs.
     ignore_title_keywords:
       - "WIP"
       - "DO NOT MERGE"
+      - "chore(deps)" # Renovate: routine dependency updates
+      - "fix(deps)" # Renovate: security/CVE updates
     drafts: false
     base_branches:
       - "main"
-    # Renovate PRs are mechanical dependency updates — save review credits
-    # for human-authored PRs. Still validated by CI.
-    ignore_usernames:
-      - "renovate[bot]"
 
   tools:
     shellcheck:

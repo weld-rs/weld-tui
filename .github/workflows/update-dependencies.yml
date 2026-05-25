@@ -1,0 +1,51 @@
+#
+# Runs Renovate to update pinned dependency versions.
+#
+# Two cron entries ensure Renovate runs on the right day(s):
+#   - Every Saturday: vulnerability schedule matches, CVE PRs created/updated
+#   - 1st of the month: monthly schedule matches, routine dependency PRs created/updated
+#
+# Renovate's internal schedule config (renovate.json) gates what actually
+# happens on each run. Schedules are day-only (no time window), so any time
+# the workflow lands on a target day in America/New_York, Renovate will act.
+#
+# Prerequisites:
+#   - RENOVATE_TOKEN repo secret: a GitHub PAT (classic) with `repo` and
+#     `workflow` scopes, or a fine-grained PAT with Contents + Pull Requests
+#     + Workflows read/write. PRs created with GITHUB_TOKEN won't trigger CI
+#     workflows, so a PAT is required.
+#
+
+name: 🔄 Update Dependencies
+
+on:
+  schedule:
+    - cron: '30 9 * * 6' # every Saturday at 4:30 AM EST / 5:30 AM EDT (CVE fixes)
+    - cron: '30 9 1 * *' # 1st of month at 4:30 AM EST / 5:30 AM EDT (routine updates)
+  workflow_dispatch: # Manual trigger
+
+# Renovate uses RENOVATE_TOKEN (PAT), not GITHUB_TOKEN, so the workflow
+# needs no default token permissions.
+permissions: {}
+
+# When the 1st lands on a Saturday, both cron entries match and the workflow
+# would fire twice. Serialize runs so the second is queued rather than
+# racing the first.
+concurrency:
+  group: update-dependencies
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: renovate/renovate:43@sha256:4967cc8504f7b81f6c500e15edd9ff040f86aeb02364336fec6bc711f2f8aa97
+    steps:
+      - name: Run Renovate
+        env:
+          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
+          RENOVATE_PLATFORM: github
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          LOG_LEVEL: ${{ github.event_name == 'workflow_dispatch' && 'debug' || 'info' }}
+        run: renovate
