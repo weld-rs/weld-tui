@@ -7,6 +7,8 @@
 #      are found, the commit is blocked.
 #   2. Runs `cargo fmt` to auto-format all Rust code. Any files changed by the
 #      formatter are staged so the commit always includes formatted code.
+#      Fails if more than 3 files outside the staged set get reformatted —
+#      a sign of baseline drift or unstaged WIP being silently swept up.
 #
 # Setup:
 #   Run `just bootstrap` (or `git config core.hooksPath .githooks`) to
@@ -47,6 +49,23 @@ if [ -n "$FMT_CMD" ]; then
     # Stage all files the formatter touched
     REFORMATTED=$(git diff --name-only -- '*.rs')
     if [ -n "$REFORMATTED" ]; then
+        # Tripwire: fail if cargo fmt reformatted >3 files outside the staged set —
+        # catches baseline drift or unstaged WIP being silently swept into the commit.
+        STRAY_FILES=$(comm -23 \
+            <(echo "$REFORMATTED" | sort -u) \
+            <(echo "$STAGED_FILES" | sort -u))
+        STRAY_COUNT=0
+        if [ -n "$STRAY_FILES" ]; then
+            STRAY_COUNT=$(echo "$STRAY_FILES" | wc -l | tr -d ' ')
+        fi
+        if [ "$STRAY_COUNT" -gt 3 ]; then
+            echo "❌ cargo fmt reformatted $STRAY_COUNT file(s) outside the staged set:"
+            echo "$STRAY_FILES" | sed 's/^/   /'
+            echo ""
+            echo "   This usually means baseline drift or unstaged WIP got formatted."
+            echo "   Run 'cargo fmt' yourself, review the changes, and commit separately."
+            exit 1
+        fi
         echo "$REFORMATTED" | xargs git add
         echo "✅ Reformatted and re-staged: $(echo "$REFORMATTED" | wc -l | tr -d ' ') file(s)"
     fi
