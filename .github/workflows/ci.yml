@@ -1,33 +1,78 @@
 # Continuous Integration — format, lint, test, and scan on every push and PR.
 
-name: CI
+name: 🧪 Continuous Integration
 
+# Path filters are duplicated across push and pull_request because GitHub
+# doesn't support a workflow-level shared filter. Both lists must stay in
+# sync. CI is restricted to artifact-affecting files; doc/tooling-only
+# changes skip CI (including the secrets scan — the pre-commit hook is the
+# primary defense locally).
+#
+# Both events fire on PR branches by design: push tests the branch HEAD in
+# isolation; pull_request tests a synthetic merge commit against main,
+# catching integration breakage from concurrent landings on main.
 on:
   push:
-    branches: [main]
+    branches:
+      - '**'
+      - '!main' # PR run already covers main merges
+    paths:
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+      - "test-fixtures/**"
+      - ".github/workflows/**"
   pull_request:
-    branches: [main]
-  workflow_dispatch:
+    branches:
+      - main
+    paths:
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+      - "test-fixtures/**"
+      - ".github/workflows/**"
 
 permissions:
   contents: read
+
+concurrency:
+  # Per-ref grouping: each branch's runs cancel earlier in-flight runs when
+  # superseded by a new push. Saves CI minutes on rapid push-and-fix cycles.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
-    name: Check
+  # Catches workflow typos and expression errors at PR time. Especially
+  # valuable for workflows that don't run on PRs (update-dependencies is
+  # scheduled + workflow_dispatch only) where bugs would otherwise surface
+  # days later on the next scheduled run.
+  lint-workflows:
+    name: Lint Workflows
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      # Secrets scan — belt-and-suspenders in case pre-commit hook wasn't installed
-      # https://github.com/mongodb/kingfisher
-      #
-      # NOTE: Kingfisher does not publish checksums or signatures for its
-      # release assets. HTTPS from GitHub is the only integrity guarantee.
+      - name: Lint Workflow Files
+        uses: raven-actions/actionlint@205b530c5d9fa8f44ae9ed59f341a0db994aa6f8 # v2
+        with:
+          flags: -shellcheck="shellcheck -S warning"
+
+  # Secrets scan — belt-and-suspenders in case pre-commit hook wasn't installed.
+  # https://github.com/mongodb/kingfisher
+  #
+  # NOTE: Kingfisher does not publish checksums or signatures for its
+  # release assets. HTTPS from GitHub is the only integrity guarantee.
+  secrets-scan:
+    name: Secrets Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
       - name: Install Kingfisher
         env:
           # renovate: datasource=github-releases depName=mongodb/kingfisher
@@ -58,6 +103,16 @@ jobs:
             echo "::error::$VALID_COUNT active secret(s) detected in repository"
             exit 1
           fi
+
+  # Code-level verification: format, lint, build, and test the Rust workspace.
+  # Steps share the cargo cache and are sequenced to fail fast on the cheapest
+  # checks (format → lint → build → test).
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
