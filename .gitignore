@@ -1,5 +1,9 @@
 SESSION_CONTEXT.md
 
+# Claude Code — per-developer state (user-project memory, local settings overrides)
+.claude/projects/
+.claude/settings.local.json
+
 # Build
 /target
 

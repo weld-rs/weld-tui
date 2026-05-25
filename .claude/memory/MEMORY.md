@@ -1,0 +1,3 @@
+- [Itemize new config settings in release notes](project_config_release_notes.md) — auto-created config.toml is never updated; new keys must be called out in release notes
+- [Keybinding design philosophy](project_keybinding_design.md) — no command mode; single-key + chords; behavior adapts to state
+- [Theme comment style](project_theme_comments.md) — Theme field comments describe what is being themed, not color expectations
