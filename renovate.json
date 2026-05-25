@@ -13,7 +13,7 @@
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
     "schedule": ["on Saturday"],
-    "addLabels": ["security"]
+    "addLabels": ["🎯 High"]
   },
   "prBodyTemplate": "{{{header}}}{{{table}}}{{{notes}}}{{{changelogs}}}{{{configDescription}}}{{{controls}}}{{{footer}}}",
   "prBodyColumns": [
@@ -54,7 +54,7 @@
     {
       "description": "Highlight breaking changes with label",
       "matchUpdateTypes": ["major"],
-      "addLabels": ["breaking-change"]
+      "addLabels": ["🎯 High"]
     }
   ]
 }
