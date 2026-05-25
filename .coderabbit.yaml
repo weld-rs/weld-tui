@@ -66,6 +66,10 @@ reviews:
     drafts: false
     base_branches:
       - "main"
+    # Renovate PRs are mechanical dependency updates — save review credits
+    # for human-authored PRs. Still validated by CI.
+    ignore_usernames:
+      - "renovate[bot]"
 
   tools:
     shellcheck:
