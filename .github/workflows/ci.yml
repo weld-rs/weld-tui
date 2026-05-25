@@ -1,15 +1,21 @@
 # Continuous Integration — format, lint, test, and scan on every push and PR.
 
-name: CI
+name: 🧪 Continuous Integration
 
 # Path filters are duplicated across push and pull_request because GitHub
 # doesn't support a workflow-level shared filter. Both lists must stay in
 # sync. CI is restricted to artifact-affecting files; doc/tooling-only
 # changes skip CI (including the secrets scan — the pre-commit hook is the
 # primary defense locally).
+#
+# Both events fire on PR branches by design: push tests the branch HEAD in
+# isolation; pull_request tests a synthetic merge commit against main,
+# catching integration breakage from concurrent landings on main.
 on:
   push:
-    branches: [main]
+    branches:
+      - '**'
+      - '!main' # PR run already covers main merges
     paths:
       - "**/*.rs"
       - "**/Cargo.toml"
@@ -17,14 +23,14 @@ on:
       - "test-fixtures/**"
       - ".github/workflows/**"
   pull_request:
-    branches: [main]
+    branches:
+      - main
     paths:
       - "**/*.rs"
       - "**/Cargo.toml"
       - "Cargo.lock"
       - "test-fixtures/**"
       - ".github/workflows/**"
-  workflow_dispatch:
 
 permissions:
   contents: read
