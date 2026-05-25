@@ -70,8 +70,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     app.saved_files.sort();
     app.saved_files.dedup();
-    for name in &app.saved_files {
-        println!("{name}: saved");
+    let left_path = app.model.left_content.path().display().to_string();
+    for path in &app.saved_files {
+        let (basename, side) = if path == &left_path {
+            (&app.left_filename, "left")
+        } else {
+            (&app.right_filename, "right")
+        };
+        println!("{basename} ({side}): saved");
     }
 
     result

@@ -166,10 +166,6 @@ fn save_side(app: &mut App, side: Side) -> bool {
         Side::Left => app.model.left_content.save(),
         Side::Right => app.model.right_content.save(),
     };
-    let filename = match side {
-        Side::Left => app.left_filename.clone(),
-        Side::Right => app.right_filename.clone(),
-    };
     let full_path = match side {
         Side::Left => app.model.left_content.path().display().to_string(),
         Side::Right => app.model.right_content.path().display().to_string(),
@@ -180,7 +176,7 @@ fn save_side(app: &mut App, side: Side) -> bool {
                 Side::Left => app.model.left_dirty = false,
                 Side::Right => app.model.right_dirty = false,
             }
-            app.saved_files.push(filename);
+            app.saved_files.push(full_path);
             true
         }
         Err(err) => {
@@ -722,12 +718,13 @@ mod tests {
         let left = vec!["a", "b"];
         let right = vec!["a", "X"];
         let (mut app, _dir) = test_app_with_files(&left, &right);
+        let right_path = app.model.right_content.path().display().to_string();
         handle_key(&mut app, key(KeyCode::Char('L'))); // dirty right
 
         handle_key(&mut app, key(KeyCode::Char('w')));
 
         assert!(!app.model.right_dirty, "w should clear dirty flag");
-        assert_eq!(app.saved_files, vec!["right.txt"]);
+        assert_eq!(app.saved_files, vec![right_path]);
         assert!(app.overlay.is_none());
     }
 
@@ -765,6 +762,7 @@ mod tests {
         let left = vec!["a", "X"];
         let right = vec!["a", "Y"];
         let (mut app, _dir) = test_app_with_files(&left, &right);
+        let left_path = app.model.left_content.path().display().to_string();
         app.model.left_dirty = true;
         app.model.right_dirty = true;
         app.overlay = Some(Overlay::SavePicker);
@@ -773,7 +771,7 @@ mod tests {
 
         assert!(!app.model.left_dirty, "l should save left");
         assert!(app.model.right_dirty, "l should not save right");
-        assert_eq!(app.saved_files, vec!["left.txt"]);
+        assert_eq!(app.saved_files, vec![left_path]);
         assert!(app.overlay.is_none(), "picker should dismiss");
     }
 
@@ -782,6 +780,7 @@ mod tests {
         let left = vec!["a", "X"];
         let right = vec!["a", "Y"];
         let (mut app, _dir) = test_app_with_files(&left, &right);
+        let right_path = app.model.right_content.path().display().to_string();
         app.model.left_dirty = true;
         app.model.right_dirty = true;
         app.overlay = Some(Overlay::SavePicker);
@@ -790,7 +789,7 @@ mod tests {
 
         assert!(app.model.left_dirty, "r should not save left");
         assert!(!app.model.right_dirty, "r should save right");
-        assert_eq!(app.saved_files, vec!["right.txt"]);
+        assert_eq!(app.saved_files, vec![right_path]);
         assert!(app.overlay.is_none());
     }
 
@@ -876,6 +875,7 @@ mod tests {
         let left = vec!["a", "b"];
         let right = vec!["a", "X"];
         let (mut app, _dir) = test_app_with_files(&left, &right);
+        let right_path = app.model.right_content.path().display().to_string();
         handle_key(&mut app, key(KeyCode::Char('L'))); // dirty right
 
         handle_key(&mut app, key(KeyCode::Char('w'))); // save
@@ -883,7 +883,7 @@ mod tests {
 
         assert!(!app.running, "q after w should quit");
         assert!(!app.model.right_dirty);
-        assert_eq!(app.saved_files, vec!["right.txt"]);
+        assert_eq!(app.saved_files, vec![right_path]);
     }
 
     #[test]
