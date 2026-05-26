@@ -1,0 +1,160 @@
+# Release — manually-triggered build of prebuilt binaries + GitHub Release.
+#
+# Trigger: workflow_dispatch only (for now). Tag-based trigger (push: tags:)
+# is intentionally not enabled yet — workflow_dispatch is the deliberate
+# manual gate while the matrix is being shaken out. Adding
+# `push: { tags: ['v*'] }` later is additive; the build/release jobs are
+# trigger-agnostic.
+#
+# Version source of truth: workspace.package.version in Cargo.toml. Bump it
+# (and CHANGELOG.md) in a normal PR, merge to main, then run this workflow.
+# release-plz can take over those edits later without touching this file.
+#
+# Windows is a stub job for v0.1.0 — reserves the matrix slot in the
+# Actions UI but produces no artifact. Replace with a real build when
+# Windows support is ready (see #42).
+
+name: 🚀 Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write # create tag + release, upload assets
+
+concurrency:
+  # Serialize releases — never cancel a release in progress.
+  group: release
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  prepare:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Read version from Cargo.toml
+        id: version
+        run: |
+          VERSION=$(grep -E '^version = ' Cargo.toml | head -1 | sed -E 's/version = "(.+)"/\1/')
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not parse workspace.package.version from Cargo.toml"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Release version: v$VERSION"
+
+      - name: Verify tag doesn't already exist
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if git ls-remote --tags origin | grep -q "refs/tags/${TAG}$"; then
+            echo "::error::Tag ${TAG} already exists on origin. Bump workspace.package.version in Cargo.toml."
+            exit 1
+          fi
+
+  build-nix:
+    name: Build (${{ matrix.target }})
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-apple-darwin
+            os: macos-13
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry & build
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.target }}-cargo-
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }} --bin weld
+
+      - name: Package archive
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          NAME="weld-v${VERSION}-${{ matrix.target }}"
+          STAGE="dist/${NAME}"
+          mkdir -p "$STAGE"
+          cp "target/${{ matrix.target }}/release/weld" "$STAGE/"
+          cp README.md LICENSE "$STAGE/"
+          tar -czf "dist/${NAME}.tar.gz" -C dist "${NAME}"
+          (cd dist && shasum -a 256 "${NAME}.tar.gz" > "${NAME}.tar.gz.sha256")
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: weld-${{ matrix.target }}
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+  # Reserves the matrix slot in the Actions UI. No artifact is produced and
+  # nothing is published. Replace with a real build when Windows is ready (#42).
+  build-windows:
+    name: Build (x86_64-pc-windows-msvc) [stub]
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Placeholder
+        run: echo "::notice::Windows build is not yet implemented. This job is a stub for v0.1.0 (see #42)."
+
+  release:
+    name: Publish GitHub Release
+    needs: [prepare, build-nix, build-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la dist/
+
+      - name: Create release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: ${{ needs.prepare.outputs.tag }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/*.tar.gz
+            dist/*.sha256
