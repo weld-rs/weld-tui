@@ -10,9 +10,9 @@
 # (and CHANGELOG.md) in a normal PR, merge to main, then run this workflow.
 # release-plz can take over those edits later without touching this file.
 #
-# Windows is a stub job for v0.1.0 — reserves the matrix slot in the
-# Actions UI but produces no artifact. Replace with a real build when
-# Windows support is ready (see #42).
+# Windows and Intel Mac are stub jobs for v0.1.0 — they reserve the
+# matrix slots in the Actions UI but produce no artifacts. Replace with
+# real builds when ready (Windows: #42, Intel Mac: #46).
 
 name: 🚀 Release
 
@@ -72,8 +72,6 @@ jobs:
         include:
           - target: aarch64-apple-darwin
             os: macos-latest
-          - target: x86_64-apple-darwin
-            os: macos-13
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
           - target: aarch64-unknown-linux-gnu
@@ -132,9 +130,22 @@ jobs:
         run: |
           echo "::notice::Windows build is not yet implemented. This job is a stub for v0.1.0 (see #42)."
 
+  # Reserves the matrix slot in the Actions UI. No artifact is produced and
+  # nothing is published. Path forward (native build, cross-compile, or
+  # drop) is tracked in #46.
+  build-intel-mac:
+    name: Build (x86_64-apple-darwin) [stub]
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Placeholder
+        run: |
+          echo "::notice::Intel Mac build is stubbed pending support decision (see #46)."
+
   release:
     name: Publish GitHub Release
-    needs: [prepare, build-nix, build-windows]
+    needs: [prepare, build-nix, build-windows, build-intel-mac]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

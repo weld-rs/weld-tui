@@ -23,8 +23,8 @@ terminal-native alternative to meld, BeyondCompare, and DiffMerge.
 - Config file support (framework + `show_minimap`)
 - Cross-platform path handling (Windows `USERPROFILE` fallback)
 - Release workflow (`workflow_dispatch`) producing prebuilt binaries for
-  macOS (arm64, x86_64) and Linux (x86_64, arm64). Windows is stubbed
-  pending #42.
+  macOS (Apple Silicon) and Linux (x86_64, arm64). Windows and Intel Mac
+  are stubbed pending future decisions (#42, #46).
 
 [Unreleased]: https://github.com/weld-rs/weld-tui/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/weld-rs/weld-tui/releases/tag/v0.1.0
