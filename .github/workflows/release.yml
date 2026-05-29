@@ -129,7 +129,8 @@ jobs:
     timeout-minutes: 1
     steps:
       - name: Placeholder
-        run: echo "::notice::Windows build is not yet implemented. This job is a stub for v0.1.0 (see #42)."
+        run: |
+          echo "::notice::Windows build is not yet implemented. This job is a stub for v0.1.0 (see #42)."
 
   release:
     name: Publish GitHub Release
