@@ -1,3 +1,4 @@
 - [Itemize new config settings in release notes](project_config_release_notes.md) — auto-created config.toml is never updated; new keys must be called out in release notes
 - [Keybinding design philosophy](project_keybinding_design.md) — no command mode; single-key + chords; behavior adapts to state
 - [Theme comment style](project_theme_comments.md) — Theme field comments describe what is being themed, not color expectations
+- [macos-13 runner queue + deprecation](project_macos13_runner_queue.md) — macos-13 Intel runners queue 50+ min and are deprecated; prefer macos-latest + target for x86_64 builds
