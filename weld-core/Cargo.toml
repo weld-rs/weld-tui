@@ -9,5 +9,5 @@ description = "Diff engine and merge logic for weld"
 similar = { version = "3", features = ["inline"] }
 
 [dev-dependencies]
-pretty_assertions = "1"
-tempfile = "3"
+pretty_assertions = "=1.4.1"
+tempfile = "=3.27.0"
