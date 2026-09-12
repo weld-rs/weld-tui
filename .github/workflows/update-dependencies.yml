@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
-      image: renovate/renovate:43@sha256:4967cc8504f7b81f6c500e15edd9ff040f86aeb02364336fec6bc711f2f8aa97
+      image: renovate/renovate:44@sha256:d8fa5cceb1c68315c235559c981b5486db0165fd25e186a0cb6125f81578be87
     steps:
       - name: Run Renovate
         env:
